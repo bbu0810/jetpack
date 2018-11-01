@@ -34,7 +34,7 @@ class Jetpack_Gutenberg {
 	 * @var array $blocks Array of blocks we will be registering.
 	 */
 	public static $blocks = array();
-
+	public static $blocks_index = array();
 	/**
 	 * Add a block to the list of blocks to be registered.
 	 *
@@ -58,9 +58,10 @@ class Jetpack_Gutenberg {
 		if ( ! self::should_load_blocks() ) {
 			return;
 		}
-
+		// Should we do this?
+		self::$block_index = json_decode( file_get_contents( JETPACK__PLUGIN_DIR . '/_inc/blocks/index.json' ) );
 		foreach ( self::$blocks as $type => $args ) {
-			if ( isset( $args['availability']['available'] ) && $args['availability']['available'] ) {
+			if ( isset( $args['availability']['available'] ) && $args['availability']['available'] && in_array( $type, self::$blocks_index ) ) {
 				register_block_type( 'jetpack/' . $type, $args['args'] );
 			}
 		}
