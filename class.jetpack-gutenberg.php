@@ -60,7 +60,7 @@ class Jetpack_Gutenberg {
 		}
 
 		foreach ( self::$blocks as $type => $args ) {
-			if ( $args['availability']['available'] ) {
+			if ( isset( $args['availability']['available'] ) && $args['availability']['available'] ) {
 				register_block_type( 'jetpack/' . $type, $args['args'] );
 			}
 		}
@@ -77,8 +77,7 @@ class Jetpack_Gutenberg {
 			$unavailability_reason = array();
 			if ( ! $available['available'] ) {
 				$unavailability_reason = array(
-					'unavailability_reason' => ( isset( $availability['unavailability_reason'] ) ? $availability['unavailability_reason'] : 'unknown' ),
-					'unavailability_message' => ( isset( $availability['unavailability_message'] ) ? $availability['unavailability_message'] : '' ),
+					'unavailable_reason' => ( isset( $availability['unavailable_reason'] ) ? $availability['unavailable_reason'] : 'unknown' )
 				);
 			}
 			$blocks_availability[ $type ] = array_merge( $available, $unavailability_reason );
@@ -229,7 +228,7 @@ class Jetpack_Gutenberg {
 		wp_localize_script(
 			'jetpack-blocks-editor',
 			'Jetpack_Initial_State',
-			self::get_block_avaiability()
+			self::get_block_availability()
 		);
 
 		Jetpack::setup_wp_i18n_locale_data();
