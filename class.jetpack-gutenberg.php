@@ -58,8 +58,17 @@ class Jetpack_Gutenberg {
 		if ( ! self::should_load_blocks() ) {
 			return;
 		}
-		// Should we do this?
-		self::$block_index = json_decode( file_get_contents( JETPACK__PLUGIN_DIR . '/_inc/blocks/index.json' ) );
+		/**
+		 * Filter the list of blocks that are available though jetpack.
+		 *
+		 * This filter is populated by Jetpack_Gutenberg::jetpack_set_available_blocks
+		 *
+		 * @since 6.8.0
+		 *
+		 * @param array
+		 */
+		self::$blocks_index = apply_filters( 'jetpack_set_available_blocks', array() );
+
 		foreach ( self::$blocks as $type => $args ) {
 			if ( isset( $args['availability']['available'] ) && $args['availability']['available'] && in_array( $type, self::$blocks_index ) ) {
 				register_block_type( 'jetpack/' . $type, $args['args'] );
@@ -67,7 +76,30 @@ class Jetpack_Gutenberg {
 		}
 	}
 
+	public static function preset_exists( $preset ) {
+		return file_exists( JETPACK__PLUGIN_DIR . '/_inc/blocks/' . $preset . '.json' );
+	}
+
+	public static function get_preset( $preset ) {
+		return json_decode( file_get_contents(  JETPACK__PLUGIN_DIR . '/_inc/blocks/' . $preset . '.json' ) );
+	}
+
+	public static function jetpack_set_available_blocks( $blocks ) {
+		$preset_blocks =  self::preset_exists( 'index' ) ? self::get_preset( 'index' ) : $blocks;
+		if ( Jetpack_Constants::is_true( 'JETPACK_BETA_BLOCKS' ) ) {
+			$beta_blocks = self::preset_exists( 'index-beta' ) ? self::get_preset( 'index-beta' ) : array();
+			return array_merge( $preset_blocks, $beta_blocks );
+		}
+
+		return $preset_blocks;
+	}
+
 	public static function get_block_availability() {
+
+		if ( ! self::should_load_blocks() ) {
+			return array();
+		}
+
 		$blocks_availability = array(); // default
 
 		foreach ( self::$blocks as $type => $args ) {
@@ -82,6 +114,12 @@ class Jetpack_Gutenberg {
 				);
 			}
 			$blocks_availability[ $type ] = array_merge( $available, $unavailability_reason );
+		}
+
+		foreach ( self::$blocks_index as $block ) {
+			if ( ! isset( $blocks_availability[ $block ] ) ) {
+				$blocks_availability[ $block ] = array( 'available' => false, 'unavailable_reason' => 'missing_module' );
+			}
 		}
 
 		return $blocks_availability;
@@ -136,7 +174,7 @@ class Jetpack_Gutenberg {
 		$style_relative_path = '_inc/blocks/' . $type . '/view' . ( is_rtl() ? '.rtl' : '' ) . '.css';
 		if ( self::block_has_asset( $style_relative_path ) ) {
 			$style_version = self::get_asset_version( $style_relative_path );
-			$view_style    = plugins_url( $style_relative_path, JETPACK__PLUGIN_FILE );
+			$view_style    = plugins_url( $style_relative_path, JETPACK__PLUGIN_DIR );
 			wp_enqueue_style( 'jetpack-block-' . $type, $view_style, array(), $style_version );
 		}
 
@@ -144,7 +182,7 @@ class Jetpack_Gutenberg {
 		$script_relative_path = '_inc/blocks/' . $type . '/view.js';
 		if ( self::block_has_asset( $script_relative_path ) ) {
 			$script_version = self::get_asset_version( $script_relative_path );
-			$view_script    = plugins_url( $script_relative_path, JETPACK__PLUGIN_FILE );
+			$view_script    = plugins_url( $script_relative_path, JETPACK__PLUGIN_DIR );
 			wp_enqueue_script( 'jetpack-block-' . $type, $view_script, array(), $script_version, false );
 		}
 	}
@@ -229,7 +267,10 @@ class Jetpack_Gutenberg {
 		wp_localize_script(
 			'jetpack-blocks-editor',
 			'Jetpack_Initial_State',
-			self::get_block_availability()
+			array(
+				'available_blocks' => self::get_block_availability(),
+				'jetpack' => array( 'is_active' => Jetpack::is_active() ),
+			)
 		);
 
 		Jetpack::setup_wp_i18n_locale_data();
