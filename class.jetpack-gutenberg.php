@@ -10,6 +10,7 @@
  *
  * @param string $type Slug of the block. Will be prefixed with jetpack/.
  * @param array  $args Arguments that are passed into the register_block_type.
+ * @param array  $avalibility Arguments that tells us what kind of avalibility the block has
  *
  * @see register_block_type
  *
@@ -17,9 +18,9 @@
  *
  * @return void
  */
-function jetpack_register_block( $type, $args = array() ) {
+function jetpack_register_block( $type, $args = array(), $availability = array( 'available' => true ) ) {
 	$type = sanitize_title_with_dashes( $type );
-	Jetpack_Gutenberg::add_block( $type, $args );
+	Jetpack_Gutenberg::add_block( $type, $args, $availability );
 }
 
 /**
@@ -40,8 +41,8 @@ class Jetpack_Gutenberg {
 	 * @param string $type Slug of the block.
 	 * @param array  $args Arguments that are passed into the register_block_type.
 	 */
-	public static function add_block( $type, $args ) {
-		self::$blocks[ $type ] = $args;
+	public static function add_block( $type, $args, $availability ) {
+		self::$blocks[ $type ] = array( 'args' => $args, 'availability' => $availability );
 	}
 
 	/**
@@ -59,11 +60,31 @@ class Jetpack_Gutenberg {
 		}
 
 		foreach ( self::$blocks as $type => $args ) {
-			register_block_type(
-				'jetpack/' . $type,
-				$args
-			);
+			if ( $args['availability']['available'] ) {
+				register_block_type( 'jetpack/' . $type, $args['args'] );
+			}
 		}
+	}
+
+	public static function get_block_availability() {
+		$blocks_availability = array(); // default
+
+		foreach ( self::$blocks as $type => $args ) {
+			$availability = $args['availability'];
+			$available = array(
+				'available' => ( isset( $availability['available'] ) ? (bool) $availability['available'] : true ),
+			);
+			$unavailability_reason = array();
+			if ( ! $available['available'] ) {
+				$unavailability_reason = array(
+					'unavailability_reason' => ( isset( $availability['unavailability_reason'] ) ? $availability['unavailability_reason'] : 'unknown' ),
+					'unavailability_message' => ( isset( $availability['unavailability_message'] ) ? $availability['unavailability_message'] : '' ),
+				);
+			}
+			$blocks_availability[ $type ] = array_merge( $available, $unavailability_reason );
+		}
+
+		return $blocks_availability;
 	}
 
 	/**
@@ -205,11 +226,10 @@ class Jetpack_Gutenberg {
 			plugins_url( '_inc/blocks/', JETPACK__PLUGIN_FILE )
 		);
 
-		$jp_react_page = new Jetpack_React_Page();
 		wp_localize_script(
 			'jetpack-blocks-editor',
 			'Jetpack_Initial_State',
-			$jp_react_page->get_initial_state()
+			self::get_block_avaiability()
 		);
 
 		Jetpack::setup_wp_i18n_locale_data();
